@@ -3,7 +3,6 @@ pipeline {
 	agent any
 
 	environment {
-		DOCKERHUB_CREDENTIALS=credentials('belt-token')
 		AWS_ACCESS_KEY_ID     = credentials('Access_key_ID')
   		AWS_SECRET_ACCESS_KEY = credentials('Secret_access_key')
 		ARTIFACT_NAME = 'hackathon.json'
@@ -13,28 +12,35 @@ pipeline {
         AWS_EB_APP_VERSION = "${BUILD_ID}"
 	}
 
-	stages {
+	stages {       stage('Build'){
+            steps {
+                sh "mvn clean"
 
-		stage('Build') {
+                sh "mvn compile"
+            }
+        }
 
-			steps {
-				sh 'docker build -t chandradeoarya/goldenwaste:1.0 .'
-			}
-		}
+        stage('Test'){
+            steps {
+                sh "mvn test"
+            }
 
-		stage('Login') {
+            post {
+                always {
+                    junit '**/target/surefire-reports/TEST-*.xml'
+                }
+            }
+        }
 
-			steps {
-				sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
-			}
-		}
+        stage('sonar scan'){
+            steps {
+              sh "mvn clean verify sonar:sonar \
+  -Dsonar.projectKey=class-chandra-d2a1-repeat \
+  -Dsonar.host.url=http://54.226.50.200 \
+  -Dsonar.login=sqp_d7baf278c0ef8e56894f4a426fb2e124470d954a"
+            }
+        }
 
-		stage('Push') {
-
-			steps {
-				sh 'docker push chandradeoarya/goldenwaste:1.0'
-			}
-		}
 
         stage('Deploy') {
             steps {
@@ -44,10 +50,4 @@ pipeline {
             }
 	}
     }
-	post {
-		always {
-			sh 'docker logout'
-		}
-	}
-
 }
